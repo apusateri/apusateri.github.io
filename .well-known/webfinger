@@ -1,0 +1,25 @@
+{
+    "subject":"acct:anthony@esq.social",
+    "aliases":
+    [
+        "https://esq.social/@anthony",
+        "https://esq.social/users/anthony"
+    ],
+    "links":
+    [
+        {
+            "rel":"http://webfinger.net/rel/profile-page",
+            "type":"text/html",
+            "href":"https://esq.social/@anthony"
+        },
+        {
+            "rel":"self",
+            "type":"application/activity+json",
+            "href":"https://esq.social/users/anthony"
+        },
+        {
+            "rel":"http://ostatus.org/schema/1.0/subscribe",
+            "template":"https://esq.social/authorize_interaction?uri={uri}"
+        }
+    ]
+}
