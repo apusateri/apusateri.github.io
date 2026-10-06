@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hours & Bonus Tracker (June 1 - May 31)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased p-6">
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Header & CSV Ingestion -->
+    <header class="bg-white rounded-xl shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Annual Hours & Bonus Tracker</h1>
+        <p class="text-sm text-slate-500">
+          Billing Year: <strong id="lblBillingCycle" class="text-slate-700">June 1 &ndash; May 31</strong> &bull; 
+          Base: 1,850 hrs &bull; Bonus: 1,950 hrs (Pro Bono capped at 3% credit)
+        </p>
+      </div>
+      <div>
+        <label class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm cursor-pointer transition">
+          <span>Upload CSV</span>
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+        </label>
+      </div>
+    </header>
+
+    <!-- Empty State -->
+    <div id="uploadPrompt" class="bg-white border-2 border-dashed border-slate-300 rounded-xl p-12 text-center text-slate-500">
+      <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      <p class="text-base font-semibold">Upload your tracking CSV to view reports</p>
+      <p class="text-xs text-slate-400 mt-1">Expected columns: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours</p>
+    </div>
+
+    <!-- Dashboard Content -->
+    <main id="dashboard" class="space-y-6 hidden">
+
+      <!-- Targets Summary: 1,850 vs 1,950 -->
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- 1,850 Base Card -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Base Target (1,850 hrs)</span>
+            <span id="basePctDone" class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">0%</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpiBaseCredit" class="text-3xl font-extrabold text-slate-900">0.0</span>
+            <span class="text-sm text-slate-400">/ 1,850 credit hrs</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
+            <div id="baseProgressBar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
+            <span>Remaining: <strong id="kpiBaseRemaining" class="text-slate-800">1,850</strong> hrs</span>
+            <span>Required Rate: <strong id="kpiBaseRunRate" class="text-indigo-600">0.00</strong> hrs/wkday</span>
+          </div>
+        </div>
+
+        <!-- 1,950 Bonus Card -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Bonus Threshold (1,950 hrs)</span>
+            <span id="bonusPctDone" class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">0%</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpiBonusCredit" class="text-3xl font-extrabold text-slate-900">0.0</span>
+            <span class="text-sm text-slate-400">/ 1,950 credit hrs</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
+            <div id="bonusProgressBar" class="bg-emerald-500 h-2 rounded-full" style="width: 0%"></div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
+            <span>Remaining: <strong id="kpiBonusRemaining" class="text-slate-800">1,950</strong> hrs</span>
+            <span>Required Rate: <strong id="kpiBonusRunRate" class="text-emerald-600">0.00</strong> hrs/wkday</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- KPI Metrics Row -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Billable Logged</p>
+          <p id="kpiPureBillable" class="mt-2 text-2xl font-bold text-slate-900">0.0</p>
+          <p class="text-xs text-slate-500 mt-1">Direct client billable hours</p>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pro Bono Credited</p>
+          <p id="kpiProBonoCredited" class="mt-2 text-2xl font-bold text-cyan-600">0.0</p>
+          <p class="text-xs text-slate-500 mt-1"><span id="kpiProBonoExcess">0.0</span> hrs uncredited (>3% cap)</p>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Non-Billable</p>
+          <p id="kpiTotalNonBillable" class="mt-2 text-2xl font-bold text-amber-600">0.0</p>
+          <p class="text-xs text-slate-500 mt-1"><span id="kpiNonBillablePctOverall">0%</span> of all time worked</p>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Hours Worked</p>
+          <p id="kpiGrossHours" class="mt-2 text-2xl font-bold text-slate-900">0.0</p>
+          <p class="text-xs text-slate-500 mt-1"><span id="kpiActiveDays">0</span> days logged</p>
+        </div>
+      </section>
+
+      <!-- Average Hours Per Worked Day -->
+      <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Daily Averages Breakdown (Across Active Logged Days)</h2>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center divide-x divide-slate-100">
+          <div>
+            <p class="text-xs text-slate-400">Billable / Day</p>
+            <p id="avgBillable" class="text-xl font-bold text-slate-800">0.00 hrs</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-400">Pro Bono / Day</p>
+            <p id="avgProBono" class="text-xl font-bold text-cyan-700">0.00 hrs</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-400">Credit / Day</p>
+            <p id="avgCredit" class="text-xl font-bold text-indigo-700">0.00 hrs</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-400">Non-Billable / Day</p>
+            <p id="avgNonBillable" class="text-xl font-bold text-amber-700">0.00 hrs</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-400">Total Worked / Day</p>
+            <p id="avgTotal" class="text-xl font-bold text-slate-900">0.00 hrs</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Visual Charts Grid -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Cumulative Pacing (Credit vs Base vs Bonus) -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-1">Billing Year Pacing</h3>
+          <p class="text-xs text-slate-400 mb-4">Qualifying credit vs. 1,850 and 1,950 thresholds through May 31</p>
+          <div class="h-72">
+            <canvas id="pacingChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Non-Billable Overhead % & Running Total -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-1">Non-Billable Overhead Tracking</h3>
+          <p class="text-xs text-slate-400 mb-4">Daily % overhead (bars) vs. cumulative non-billable hours (line)</p>
+          <div class="h-72">
+            <canvas id="overheadChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Monthly Breakdown (June through May sequence) -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-4">Billing Year Monthly Breakdown (Jun &ndash; May)</h3>
+          <div class="h-72">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Day of Week Distribution -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-4">Credited Hours by Day of Week</h3>
+          <div class="h-72">
+            <canvas id="dowChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    const BASE_TARGET = 1850;
+    const BONUS_TARGET = 1950;
+    let chartInstances = {};
+
+    document.getElementById('csvFileInput').addEventListener('change', handleFileUpload);
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: true,
+        transformHeader: h => h.trim().toLowerCase(),
+        complete: function(results) {
+          processData(results.data);
+        }
+      });
+    }
+
+    function processData(rows) {
+      const cleanData = rows.map(r => {
+        const dateVal = r['date'] || r['entry_date'] || '';
+        // Parse date parts directly to avoid UTC/local offset date sliding
+        const [year, month, day] = String(dateVal).split('T')[0].split('-').map(Number);
+        const parsedDate = new Date(year, (month || 1) - 1, day || 1);
+
+        const b = Number(r['billable hours'] || r['billable'] || 0);
+        const pb = Number(r['pro bono hours'] || r['pro bono'] || r['pro_bono'] || 0);
+        const nb = Number(r['non-billable hours'] || r['non-billable'] || r['non_billable'] || 0);
+        const dayTotal = b + pb + nb;
+
+        return {
+          date: parsedDate,
+          dateStr: String(dateVal).split('T')[0],
+          billable: b,
+          proBono: pb,
+          nonBillable: nb,
+          dayTotal: dayTotal,
+          nonBillablePct: dayTotal > 0 ? (nb / dayTotal) * 100 : 0
+        };
+      }).filter(r => !isNaN(r.date.getTime()))
+        .sort((a, b) => a.date - b.date);
+
+      if (cleanData.length === 0) {
+        alert('No valid dates found in CSV. Please verify column headers: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours.');
+        return;
+      }
+
+      document.getElementById('uploadPrompt').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+
+      // Determine the Billing Year cycle from the dataset
+      // A cycle starts June 1 of year Y and ends May 31 of year Y + 1
+      const latestDate = cleanData[cleanData.length - 1].date;
+      const latestYear = latestDate.getFullYear();
+      const latestMonth = latestDate.getMonth(); // 0-indexed (5 = June)
+
+      let cycleStartYear = latestMonth >= 5 ? latestYear : latestYear - 1;
+      let cycleEndYear = cycleStartYear + 1;
+      const endOfBillingCycle = new Date(cycleEndYear, 4, 31); // May 31 (month index 4)
+
+      document.getElementById('lblBillingCycle').innerText = 
+        `June 1, ${cycleStartYear} – May 31, ${cycleEndYear}`;
+
+      calculateMetrics(cleanData, endOfBillingCycle);
+      renderCharts(cleanData);
+    }
+
+    function calculateMetrics(data, endOfBillingCycle) {
+      const totalBillable = data.reduce((acc, r) => acc + r.billable, 0);
+      const totalProBono = data.reduce((acc, r) => acc + r.proBono, 0);
+      const totalNonBillable = data.reduce((acc, r) => acc + r.nonBillable, 0);
+      const grossTotal = totalBillable + totalProBono + totalNonBillable;
+
+      // Pro Bono Cap: PB can be at most 3% of Total Credit (Credit = Billable + PB_Credited)
+      // PB_Credited <= (0.03 / 0.97) * Billable
+      const maxAllowedProBono = totalBillable * (0.03 / 0.97);
+      const creditedProBono = Math.min(totalProBono, maxAllowedProBono);
+      const excessProBono = Math.max(0, totalProBono - creditedProBono);
+      const totalCredit = totalBillable + creditedProBono;
+
+      const baseRemaining = Math.max(0, BASE_TARGET - totalCredit);
+      const bonusRemaining = Math.max(0, BONUS_TARGET - totalCredit);
+      const basePct = Math.min(100, (totalCredit / BASE_TARGET) * 100);
+      const bonusPct = Math.min(100, (totalCredit / BONUS_TARGET) * 100);
+
+      // Active days with any time recorded
+      const activeDays = data.filter(r => r.dayTotal > 0).length || 1;
+
+      // Count remaining weekdays through the end of the billing year (May 31)
+      const latestDate = data[data.length - 1].date;
+      let weekdaysRemaining = 0;
+      let cur = new Date(latestDate.getFullYear(), latestDate.getMonth(), latestDate.getDate() + 1);
+
+      while (cur <= endOfBillingCycle) {
+        const d = cur.getDay();
+        if (d !== 0 && d !== 6) weekdaysRemaining++;
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      const baseRunRate = weekdaysRemaining > 0 ? (baseRemaining / weekdaysRemaining).toFixed(2) : '0.00';
+      const bonusRunRate = weekdaysRemaining > 0 ? (bonusRemaining / weekdaysRemaining).toFixed(2) : '0.00';
+
+      // Update UI cards
+      document.getElementById('kpiBaseCredit').innerText = totalCredit.toFixed(1);
+      document.getElementById('baseProgressBar').style.width = `${basePct.toFixed(1)}%`;
+      document.getElementById('basePctDone').innerText = `${basePct.toFixed(1)}%`;
+      document.getElementById('kpiBaseRemaining').innerText = baseRemaining.toFixed(1);
+      document.getElementById('kpiBaseRunRate').innerText = baseRunRate;
+
+      document.getElementById('kpiBonusCredit').innerText = totalCredit.toFixed(1);
+      document.getElementById('bonusProgressBar').style.width = `${bonusPct.toFixed(1)}%`;
+      document.getElementById('bonusPctDone').innerText = `${bonusPct.toFixed(1)}%`;
+      document.getElementById('kpiBonusRemaining').innerText = bonusRemaining.toFixed(1);
+      document.getElementById('kpiBonusRunRate').innerText = bonusRunRate;
+
+      document.getElementById('kpiPureBillable').innerText = totalBillable.toFixed(1);
+      document.getElementById('kpiProBonoCredited').innerText = creditedProBono.toFixed(1);
+      document.getElementById('kpiProBonoExcess').innerText = excessProBono.toFixed(1);
+      document.getElementById('kpiTotalNonBillable').innerText = totalNonBillable.toFixed(1);
+      document.getElementById('kpiNonBillablePctOverall').innerText = grossTotal > 0 ? `${((totalNonBillable / grossTotal) * 100).toFixed(1)}%` : '0%';
+      document.getElementById('kpiGrossHours').innerText = grossTotal.toFixed(1);
+      document.getElementById('kpiActiveDays').innerText = activeDays;
+
+      document.getElementById('avgBillable').innerText = `${(totalBillable / activeDays).toFixed(2)} hrs`;
+      document.getElementById('avgProBono').innerText = `${(totalProBono / activeDays).toFixed(2)} hrs`;
+      document.getElementById('avgCredit').innerText = `${(totalCredit / activeDays).toFixed(2)} hrs`;
+      document.getElementById('avgNonBillable').innerText = `${(totalNonBillable / activeDays).toFixed(2)} hrs`;
+      document.getElementById('avgTotal').innerText = `${(grossTotal / activeDays).toFixed(2)} hrs`;
+    }
+
+    function renderCharts(data) {
+      Object.values(chartInstances).forEach(c => c.destroy());
+
+      // 1. Cumulative Target Pacing (Billable + Allowed Pro Bono)
+      let runBillable = 0;
+      let runPB = 0;
+      const pacingLabels = [];
+      const cumulativeCredit = [];
+
+      data.forEach(r => {
+        runBillable += r.billable;
+        runPB += r.proBono;
+        const maxPB = runBillable * (0.03 / 0.97);
+        const credit = runBillable + Math.min(runPB, maxPB);
+        pacingLabels.push(r.dateStr);
+        cumulativeCredit.push(credit);
+      });
+
+      chartInstances.pacing = new Chart(document.getElementById('pacingChart'), {
+        type: 'line',
+        data: {
+          labels: pacingLabels,
+          datasets: [
+            {
+              label: 'Qualifying Credit Hours',
+              data: cumulativeCredit,
+              borderColor: '#4f46e5',
+              backgroundColor: 'rgba(79, 70, 229, 0.05)',
+              fill: true,
+              tension: 0.2,
+              pointRadius: 0
+            },
+            {
+              label: 'Base Target (1,850)',
+              data: Array(pacingLabels.length).fill(BASE_TARGET),
+              borderColor: '#f59e0b',
+              borderDash: [5, 5],
+              pointRadius: 0,
+              fill: false
+            },
+            {
+              label: 'Bonus Target (1,950)',
+              data: Array(pacingLabels.length).fill(BONUS_TARGET),
+              borderColor: '#10b981',
+              borderDash: [5, 5],
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      // 2. Non-Billable Overhead Tracking: Daily % vs Cumulative Hours
+      let runningNB = 0;
+      const runningNBValues = [];
+      const dailyNBPctValues = [];
+
+      data.forEach(r => {
+        runningNB += r.nonBillable;
+        runningNBValues.push(runningNB);
+        dailyNBPctValues.push(r.nonBillablePct);
+      });
+
+      chartInstances.overhead = new Chart(document.getElementById('overheadChart'), {
+        data: {
+          labels: pacingLabels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Cumulative Non-Billable (hrs)',
+              data: runningNBValues,
+              borderColor: '#d97706',
+              yAxisID: 'yHours',
+              pointRadius: 0,
+              tension: 0.2
+            },
+            {
+              type: 'bar',
+              label: 'Daily Non-Billable %',
+              data: dailyNBPctValues,
+              backgroundColor: 'rgba(251, 191, 36, 0.4)',
+              yAxisID: 'yPct'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            yHours: {
+              type: 'linear',
+              position: 'left',
+              beginAtZero: true,
+              title: { display: true, text: 'Total Hours' }
+            },
+            yPct: {
+              type: 'linear',
+              position: 'right',
+              beginAtZero: true,
+              max: 100,
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: '% of Daily Log' }
+            }
+          }
+        }
+      });
+
+      // 3. Billing Year Monthly Breakdown (Ordered June -> May)
+      const fiscalMonthNames = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+      // Maps standard Date.getMonth() (0 = Jan, 5 = Jun) to fiscal indices (0 = Jun, 11 = May)
+      const toFiscalIdx = m => (m >= 5 ? m - 5 : m + 7);
+
+      const mBillable = Array(12).fill(0);
+      const mProBono = Array(12).fill(0);
+      const mNonBillable = Array(12).fill(0);
+
+      data.forEach(r => {
+        const fIdx = toFiscalIdx(r.date.getMonth());
+        mBillable[fIdx] += r.billable;
+        mProBono[fIdx] += r.proBono;
+        mNonBillable[fIdx] += r.nonBillable;
+      });
+
+      chartInstances.monthly = new Chart(document.getElementById('monthlyChart'), {
+        type: 'bar',
+        data: {
+          labels: fiscalMonthNames,
+          datasets: [
+            { label: 'Billable', data: mBillable, backgroundColor: '#4f46e5' },
+            { label: 'Pro Bono', data: mProBono, backgroundColor: '#06b6d4' },
+            { label: 'Non-Billable', data: mNonBillable, backgroundColor: '#f59e0b' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+        }
+      });
+
+      // 4. Day of Week Distribution (Credited Hours)
+      const dowLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dowHours = Array(7).fill(0);
+
+      data.forEach(r => {
+        dowHours[r.date.getDay()] += (r.billable + r.proBono);
+      });
+
+      chartInstances.dow = new Chart(document.getElementById('dowChart'), {
+        type: 'bar',
+        data: {
+          labels: dowLabels,
+          datasets: [{
+            label: 'Billable + Pro Bono Hours',
+            data: dowHours,
+            backgroundColor: '#818cf8'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

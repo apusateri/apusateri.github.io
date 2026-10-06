@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hours & Bonus Tracker (June 1 - May 31)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased p-6">
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Header & CSV Ingestion -->
+    <header class="bg-white rounded-xl shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Annual Hours & Bonus Tracker</h1>
+        <p class="text-sm text-slate-500">
+          Billing Year: <strong id="lblBillingCycle" class="text-slate-700">June 1 &ndash; May 31</strong> &bull; 
+          Base: 1,850 hrs &bull; Bonus: 1,950 hrs (365-day pacing &bull; PB capped at 3% credit)
+        </p>
+      </div>
+      <div>
+        <label class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm cursor-pointer transition">
+          <span>Upload CSV</span>
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+        </label>
+      </div>
+    </header>
+
+    <!-- Empty State -->
+    <div id="uploadPrompt" class="bg-white border-2 border-dashed border-slate-300 rounded-xl p-12 text-center text-slate-500">
+      <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      <p class="text-base font-semibold">Upload your tracking CSV to view reports</p>
+      <p class="text-xs text-slate-400 mt-1">Expected columns: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours</p>
+    </div>
+
+    <!-- Dashboard Content -->
+    <main id="dashboard" class="space-y-6 hidden">
+
+      <!-- Targets Summary: 1,850 vs 1,950 -->
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- 1,850 Base Card -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Base Target (1,850 hrs)</span>
+            <span id="basePctDone" class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">0%</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpiBaseCredit" class="text-3xl font-extrabold text-slate-900">0.0</span>
+            <span class="text-sm text-slate-400">/ 1,850 credit hrs</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
+            <div id="baseProgressBar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
+            <span>Remaining: <strong id="kpiBaseRemaining" class="text-slate-800">1,850</strong> hrs</span>
+            <span>Required Rate: <strong id="kpiBaseRunRate" class="text-indigo-600">0.00</strong> hrs/day</span>
+          </div>
+        </div>
+
+        <!-- 1,950 Bonus Card -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Bonus Threshold (1,950 hrs)</span>
+            <span id="bonusPctDone" class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">0%</span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpiBonusCredit" class="text-3xl font-extrabold text-slate-900">0.0</span>
+            <span class="text-sm text-slate-400">/ 1,950 credit hrs</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
+            <div id="bonusProgressBar" class="bg-emerald-500 h-2 rounded-full" style="width: 0%"></div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
+            <span>Remaining: <strong id="kpiBonusRemaining" class="text-slate-800">1,950</strong> hrs</span>
+            <span>Required Rate: <strong id="kpiBonusRunRate" class="text-emerald-600">0.00</strong> hrs/day</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Month Status -->
+      <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide">
+              Active Month Status: <span id="currentMonthName" class="text-indigo-600">Month</span>
+            </h2>
+            <p class="text-xs text-slate-500">
+              Through <span id="currentMonthAsOfDate" class="font-medium">latest entry</span> 
+              (<span id="curMonthElapsedDays">0</span> elapsed calendar days of <span id="curMonthTotalDays">0</span> total)
+            </p>
+          </div>
+          <div class="text-sm">
+            Credit Logged MTD: <strong id="curMonthActualCredit" class="text-slate-900 text-base">0.0</strong> hrs
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div class="flex justify-between items-center text-xs font-semibold text-slate-600">
+              <span>1,850 Target (Paced as of Today)</span>
+              <span id="baseMtdDeltaBadge" class="px-2 py-0.5 rounded text-xs">--</span>
+            </div>
+            <div class="mt-2 flex items-baseline justify-between">
+              <div>
+                <span class="text-xs text-slate-400">Paced Requirement:</span>
+                <span id="baseMtdExpected" class="text-lg font-bold text-slate-800 ml-1">0.0</span> hrs
+              </div>
+              <div>
+                <span class="text-xs text-slate-400">Delta:</span>
+                <span id="baseMtdDelta" class="text-lg font-bold ml-1">0.0</span> hrs
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div class="flex justify-between items-center text-xs font-semibold text-slate-600">
+              <span>1,950 Bonus Target (Paced as of Today)</span>
+              <span id="bonusMtdDeltaBadge" class="px-2 py-0.5 rounded text-xs">--</span>
+            </div>
+            <div class="mt-2 flex items-baseline justify-between">
+              <div>
+                <span class="text-xs text-slate-400">Paced Requirement:</span>
+                <span id="bonusMtdExpected" class="text-lg font-bold text-slate-800 ml-1">0.0</span> hrs
+              </div>
+              <div>
+                <span class="text-xs text-slate-400">Delta:</span>
+                <span id="bonusMtdDelta" class="text-lg font-bold ml-1">0.0</span> hrs
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Prior Months Status Grid -->
+      <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide mb-1">Prior Months Status</h2>
+        <p class="text-xs text-slate-400 mb-4">Final performance against allocated calendar-day targets for completed months</p>
+        <div id="priorMonthsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- Full Monthly Performance Table -->
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-5 border-b border-slate-100">
+          <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Monthly Performance Ledger</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Quota allocated proportionally across calendar days per month</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+            <thead class="bg-slate-50 font-semibold text-slate-600 uppercase tracking-wider">
+              <tr>
+                <th class="px-4 py-3">Month</th>
+                <th class="px-4 py-3 text-right">Billable</th>
+                <th class="px-4 py-3 text-right">Pro Bono</th>
+                <th class="px-4 py-3 text-right">Credit Hours</th>
+                <th class="px-4 py-3 text-right">1850 Target</th>
+                <th class="px-4 py-3 text-right">1850 Delta</th>
+                <th class="px-4 py-3 text-right">1950 Target</th>
+                <th class="px-4 py-3 text-right">1950 Delta</th>
+              </tr>
+            </thead>
+            <tbody id="monthlyTableBody" class="divide-y divide-slate-100 bg-white">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Visual Charts Grid -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Daily Rate Pacing & Requirement Chart -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-1">Daily Pace & Required Run-Rates</h3>
+          <p class="text-xs text-slate-400 mb-4">7-day rolling daily average vs. required hours/day (365-day basis)</p>
+          <div class="h-72">
+            <canvas id="pacingChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Non-Billable Overhead % & Running Total -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-1">Non-Billable Overhead Tracking</h3>
+          <p class="text-xs text-slate-400 mb-4">Daily % overhead (bars) vs. cumulative non-billable hours (line)</p>
+          <div class="h-72">
+            <canvas id="overheadChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Monthly Breakdown (June through May sequence) -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-4">Billing Year Monthly Breakdown (Jun &ndash; May)</h3>
+          <div class="h-72">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Day of Week Distribution -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-semibold text-slate-800 mb-4">Credited Hours by Day of Week</h3>
+          <div class="h-72">
+            <canvas id="dowChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    const BASE_TARGET = 1850;
+    const BONUS_TARGET = 1950;
+    const FISCAL_MONTHS = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+    let chartInstances = {};
+
+    document.getElementById('csvFileInput').addEventListener('change', handleFileUpload);
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: true,
+        transformHeader: h => h.trim().toLowerCase(),
+        complete: function(results) {
+          processData(results.data);
+        }
+      });
+    }
+
+    function processData(rows) {
+      const cleanData = rows.map(r => {
+        const dateVal = r['date'] || r['entry_date'] || '';
+        const [year, month, day] = String(dateVal).split('T')[0].split('-').map(Number);
+        const parsedDate = new Date(year, (month || 1) - 1, day || 1);
+
+        const b = Number(r['billable hours'] || r['billable'] || 0);
+        const pb = Number(r['pro bono hours'] || r['pro bono'] || r['pro_bono'] || 0);
+        const nb = Number(r['non-billable hours'] || r['non-billable'] || r['non_billable'] || 0);
+        const dayTotal = b + pb + nb;
+
+        return {
+          date: parsedDate,
+          dateStr: String(dateVal).split('T')[0],
+          billable: b,
+          proBono: pb,
+          nonBillable: nb,
+          dayTotal: dayTotal,
+          nonBillablePct: dayTotal > 0 ? (nb / dayTotal) * 100 : 0
+        };
+      }).filter(r => !isNaN(r.date.getTime()))
+        .sort((a, b) => a.date - b.date);
+
+      if (cleanData.length === 0) {
+        alert('No valid dates found in CSV. Please verify column headers: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours.');
+        return;
+      }
+
+      document.getElementById('uploadPrompt').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+
+      const latestDate = cleanData[cleanData.length - 1].date;
+      const latestYear = latestDate.getFullYear();
+      const latestMonth = latestDate.getMonth();
+
+      let cycleStartYear = latestMonth >= 5 ? latestYear : latestYear - 1;
+      let cycleEndYear = cycleStartYear + 1;
+      const endOfBillingCycle = new Date(cycleEndYear, 4, 31);
+
+      document.getElementById('lblBillingCycle').innerText = 
+        `June 1, ${cycleStartYear} – May 31, ${cycleEndYear}`;
+
+      calculateMetrics(cleanData, endOfBillingCycle);
+      generateMonthlySections(cleanData, cycleStartYear, latestDate);
+      renderCharts(cleanData, endOfBillingCycle);
+    }
+
+    // Counts total calendar days inclusively between two dates
+    function countCalendarDays(startDate, endDate) {
+      if (startDate > endDate) return 0;
+      const diffTime = endDate.getTime() - startDate.getTime();
+      return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
+
+    function calculateMetrics(data, endOfBillingCycle) {
+      const totalBillable = data.reduce((acc, r) => acc + r.billable, 0);
+      const totalProBono = data.reduce((acc, r) => acc + r.proBono, 0);
+
+      const maxAllowedProBono = totalBillable * (0.03 / 0.97);
+      const creditedProBono = Math.min(totalProBono, maxAllowedProBono);
+      const totalCredit = totalBillable + creditedProBono;
+
+      const baseRemaining = Math.max(0, BASE_TARGET - totalCredit);
+      const bonusRemaining = Math.max(0, BONUS_TARGET - totalCredit);
+      const basePct = Math.min(100, (totalCredit / BASE_TARGET) * 100);
+      const bonusPct = Math.min(100, (totalCredit / BONUS_TARGET) * 100);
+
+      const latestDate = data[data.length - 1].date;
+      const nextDay = new Date(latestDate.getFullYear(), latestDate.getMonth(), latestDate.getDate() + 1);
+      const daysRemaining = countCalendarDays(nextDay, endOfBillingCycle);
+
+      const baseRunRate = daysRemaining > 0 ? (baseRemaining / daysRemaining).toFixed(2) : '0.00';
+      const bonusRunRate = daysRemaining > 0 ? (bonusRemaining / daysRemaining).toFixed(2) : '0.00';
+
+      document.getElementById('kpiBaseCredit').innerText = totalCredit.toFixed(1);
+      document.getElementById('baseProgressBar').style.width = `${basePct.toFixed(1)}%`;
+      document.getElementById('basePctDone').innerText = `${basePct.toFixed(1)}%`;
+      document.getElementById('kpiBaseRemaining').innerText = baseRemaining.toFixed(1);
+      document.getElementById('kpiBaseRunRate').innerText = baseRunRate;
+
+      document.getElementById('kpiBonusCredit').innerText = totalCredit.toFixed(1);
+      document.getElementById('bonusProgressBar').style.width = `${bonusPct.toFixed(1)}%`;
+      document.getElementById('bonusPctDone').innerText = `${bonusPct.toFixed(1)}%`;
+      document.getElementById('kpiBonusRemaining').innerText = bonusRemaining.toFixed(1);
+      document.getElementById('kpiBonusRunRate').innerText = bonusRunRate;
+    }
+
+    function generateMonthlySections(data, startYear, latestDate) {
+      const cycleStart = new Date(startYear, 5, 1);
+      const cycleEnd = new Date(startYear + 1, 4, 31);
+      const totalYearDays = countCalendarDays(cycleStart, cycleEnd) || 365;
+
+      const baseRatePerDay = BASE_TARGET / totalYearDays;   // ~5.068 hrs/day
+      const bonusRatePerDay = BONUS_TARGET / totalYearDays; // ~5.342 hrs/day
+
+      const monthlyData = {};
+      data.forEach(r => {
+        const key = `${r.date.getFullYear()}-${r.date.getMonth()}`;
+        if (!monthlyData[key]) {
+          monthlyData[key] = { billable: 0, proBono: 0, nonBillable: 0 };
+        }
+        monthlyData[key].billable += r.billable;
+        monthlyData[key].proBono += r.proBono;
+        monthlyData[key].nonBillable += r.nonBillable;
+      });
+
+      const tbody = document.getElementById('monthlyTableBody');
+      const priorMonthsContainer = document.getElementById('priorMonthsGrid');
+      tbody.innerHTML = '';
+      priorMonthsContainer.innerHTML = '';
+
+      let curMonthExpectedBase = 0;
+      let curMonthExpectedBonus = 0;
+      let curMonthActualCredit = 0;
+      let curMonthElapsedDays = 0;
+      let curMonthTotalDays = 0;
+      let curMonthLabel = '';
+      let hasPriorMonths = false;
+
+      for (let i = 0; i < 12; i++) {
+        const calMonth = (5 + i) % 12;
+        const calYear = (5 + i) < 12 ? startYear : startYear + 1;
+        const key = `${calYear}-${calMonth}`;
+
+        const monthStart = new Date(calYear, calMonth, 1);
+        const monthEnd = new Date(calYear, calMonth + 1, 0);
+
+        if (monthStart > latestDate) break;
+
+        const isCurrentMonth = (latestDate.getFullYear() === calYear && latestDate.getMonth() === calMonth);
+        const totalMonthDays = countCalendarDays(monthStart, monthEnd);
+        const elapsedDays = isCurrentMonth 
+          ? countCalendarDays(monthStart, latestDate) 
+          : totalMonthDays;
+
+        const mRecord = monthlyData[key] || { billable: 0, proBono: 0, nonBillable: 0 };
+        const mBillable = mRecord.billable;
+        const mProBono = mRecord.proBono;
+
+        const mMaxPB = mBillable * (0.03 / 0.97);
+        const mCreditedPB = Math.min(mProBono, mMaxPB);
+        const mCredit = mBillable + mCreditedPB;
+
+        const baseTarget = (isCurrentMonth ? elapsedDays : totalMonthDays) * baseRatePerDay;
+        const bonusTarget = (isCurrentMonth ? elapsedDays : totalMonthDays) * bonusRatePerDay;
+
+        const baseDelta = mCredit - baseTarget;
+        const bonusDelta = mCredit - bonusTarget;
+
+        if (isCurrentMonth) {
+          curMonthLabel = `${FISCAL_MONTHS[i]} ${calYear}`;
+          curMonthActualCredit = mCredit;
+          curMonthExpectedBase = baseTarget;
+          curMonthExpectedBonus = bonusTarget;
+          curMonthElapsedDays = elapsedDays;
+          curMonthTotalDays = totalMonthDays;
+        } else {
+          hasPriorMonths = true;
+          const badgeClass = (d) => d >= 0 
+            ? 'bg-emerald-100 text-emerald-800' 
+            : 'bg-red-100 text-red-800';
+          const badgeText = (d) => d >= 0 
+            ? `Ahead (+${d.toFixed(1)})` 
+            : `Behind (${d.toFixed(1)})`;
+
+          const priorCard = `
+            <div class="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 flex flex-col justify-between">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-slate-800">${FISCAL_MONTHS[i]} ${calYear}</span>
+                <span class="text-xs font-semibold text-slate-600">${mCredit.toFixed(1)} hrs</span>
+              </div>
+              <div class="space-y-1.5 text-[11px]">
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-500">1,850 Base:</span>
+                  <span class="px-1.5 py-0.5 rounded font-semibold ${badgeClass(baseDelta)}">
+                    ${badgeText(baseDelta)}
+                  </span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-500">1,950 Bonus:</span>
+                  <span class="px-1.5 py-0.5 rounded font-semibold ${badgeClass(bonusDelta)}">
+                    ${badgeText(bonusDelta)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          `;
+          priorMonthsContainer.insertAdjacentHTML('beforeend', priorCard);
+        }
+
+        const deltaSpan = (val) => {
+          const sign = val >= 0 ? '+' : '';
+          const colorClass = val >= 0 ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold';
+          return `<span class="${colorClass}">${sign}${val.toFixed(1)}</span>`;
+        };
+
+        const row = `
+          <tr class="${isCurrentMonth ? 'bg-indigo-50/40 font-medium' : ''}">
+            <td class="px-4 py-3 text-slate-800">
+              ${FISCAL_MONTHS[i]} ${calYear} ${isCurrentMonth ? '<span class="text-[10px] uppercase font-bold text-indigo-600 ml-1.5 px-1.5 py-0.5 bg-indigo-100 rounded">Current MTD</span>' : ''}
+            </td>
+            <td class="px-4 py-3 text-right text-slate-700">${mBillable.toFixed(1)}</td>
+            <td class="px-4 py-3 text-right text-cyan-700">${mProBono.toFixed(1)}</td>
+            <td class="px-4 py-3 text-right font-bold text-slate-900">${mCredit.toFixed(1)}</td>
+            <td class="px-4 py-3 text-right text-slate-500">${baseTarget.toFixed(1)}</td>
+            <td class="px-4 py-3 text-right">${deltaSpan(baseDelta)}</td>
+            <td class="px-4 py-3 text-right text-slate-500">${bonusTarget.toFixed(1)}</td>
+            <td class="px-4 py-3 text-right">${deltaSpan(bonusDelta)}</td>
+          </tr>
+        `;
+        tbody.insertAdjacentHTML('beforeend', row);
+      }
+
+      if (!hasPriorMonths) {
+        priorMonthsContainer.innerHTML = '<p class="text-xs text-slate-400 italic col-span-3">Currently in first month of billing year (June). No prior months to display.</p>';
+      }
+
+      document.getElementById('currentMonthName').innerText = curMonthLabel;
+      document.getElementById('currentMonthAsOfDate').innerText = latestDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      document.getElementById('curMonthActualCredit').innerText = curMonthActualCredit.toFixed(1);
+      document.getElementById('curMonthElapsedDays').innerText = curMonthElapsedDays;
+      document.getElementById('curMonthTotalDays').innerText = curMonthTotalDays;
+
+      document.getElementById('baseMtdExpected').innerText = curMonthExpectedBase.toFixed(1);
+      const baseMTDDelta = curMonthActualCredit - curMonthExpectedBase;
+      document.getElementById('baseMtdDelta').innerText = `${baseMTDDelta >= 0 ? '+' : ''}${baseMTDDelta.toFixed(1)}`;
+      document.getElementById('baseMtdDelta').className = `text-lg font-bold ml-1 ${baseMTDDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`;
+      
+      const baseBadge = document.getElementById('baseMtdDeltaBadge');
+      baseBadge.innerText = baseMTDDelta >= 0 ? 'Ahead of Pace' : 'Behind Pace';
+      baseBadge.className = `px-2 py-0.5 rounded text-xs font-semibold ${baseMTDDelta >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`;
+
+      document.getElementById('bonusMtdExpected').innerText = curMonthExpectedBonus.toFixed(1);
+      const bonusMTDDelta = curMonthActualCredit - curMonthExpectedBonus;
+      document.getElementById('bonusMtdDelta').innerText = `${bonusMTDDelta >= 0 ? '+' : ''}${bonusMTDDelta.toFixed(1)}`;
+      document.getElementById('bonusMtdDelta').className = `text-lg font-bold ml-1 ${bonusMTDDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`;
+      
+      const bonusBadge = document.getElementById('bonusMtdDeltaBadge');
+      bonusBadge.innerText = bonusMTDDelta >= 0 ? 'Ahead of Pace' : 'Behind Pace';
+      bonusBadge.className = `px-2 py-0.5 rounded text-xs font-semibold ${bonusMTDDelta >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`;
+    }
+
+    function renderCharts(data, endOfBillingCycle) {
+      Object.values(chartInstances).forEach(c => c.destroy());
+
+      const dates = [];
+      const rollingAvgCredits = [];
+      const reqBaseRates = [];
+      const reqBonusRates = [];
+
+      let runningBillable = 0;
+      let runningProBono = 0;
+
+      const dailyCredits = data.map(r => {
+        const maxPB = r.billable * (0.03 / 0.97);
+        return r.billable + Math.min(r.proBono, maxPB);
+      });
+
+      data.forEach((r, idx) => {
+        dates.push(r.dateStr);
+        runningBillable += r.billable;
+        runningProBono += r.proBono;
+
+        const curMaxPB = runningBillable * (0.03 / 0.97);
+        const curCredit = runningBillable + Math.min(runningProBono, curMaxPB);
+
+        // 7-day rolling daily average
+        const windowStart = Math.max(0, idx - 6);
+        const windowSlice = dailyCredits.slice(windowStart, idx + 1);
+        const avg7Day = windowSlice.reduce((a, b) => a + b, 0) / windowSlice.length;
+        rollingAvgCredits.push(Number(avg7Day.toFixed(2)));
+
+        // Remaining calendar days through May 31
+        const nextDay = new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate() + 1);
+        const remDays = countCalendarDays(nextDay, endOfBillingCycle);
+
+        if (remDays > 0) {
+          const remBase = Math.max(0, BASE_TARGET - curCredit);
+          const remBonus = Math.max(0, BONUS_TARGET - curCredit);
+          reqBaseRates.push(Number((remBase / remDays).toFixed(2)));
+          reqBonusRates.push(Number((remBonus / remDays).toFixed(2)));
+        } else {
+          reqBaseRates.push(0);
+          reqBonusRates.push(0);
+        }
+      });
+
+      // 1. Daily Pace & Required Run-Rates Chart
+      chartInstances.pacing = new Chart(document.getElementById('pacingChart'), {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [
+            {
+              label: '7-Day Rolling Daily Avg',
+              data: rollingAvgCredits,
+              borderColor: '#4f46e5',
+              backgroundColor: 'rgba(79, 70, 229, 0.08)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0
+            },
+            {
+              label: 'Required Daily Rate (1,850)',
+              data: reqBaseRates,
+              borderColor: '#f59e0b',
+              borderDash: [5, 5],
+              tension: 0.1,
+              pointRadius: 0
+            },
+            {
+              label: 'Required Daily Rate (1,950)',
+              data: reqBonusRates,
+              borderColor: '#10b981',
+              borderDash: [5, 5],
+              tension: 0.1,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Hours / Calendar Day' }
+            }
+          }
+        }
+      });
+
+      // 2. Non-Billable Overhead Tracking
+      let runningNB = 0;
+      const runningNBValues = [];
+      const dailyNBPctValues = [];
+
+      data.forEach(r => {
+        runningNB += r.nonBillable;
+        runningNBValues.push(runningNB);
+        dailyNBPctValues.push(r.nonBillablePct);
+      });
+
+      chartInstances.overhead = new Chart(document.getElementById('overheadChart'), {
+        data: {
+          labels: dates,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Cumulative Non-Billable (hrs)',
+              data: runningNBValues,
+              borderColor: '#d97706',
+              yAxisID: 'yHours',
+              pointRadius: 0,
+              tension: 0.2
+            },
+            {
+              type: 'bar',
+              label: 'Daily Non-Billable %',
+              data: dailyNBPctValues,
+              backgroundColor: 'rgba(251, 191, 36, 0.4)',
+              yAxisID: 'yPct'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            yHours: {
+              type: 'linear',
+              position: 'left',
+              beginAtZero: true,
+              title: { display: true, text: 'Total Hours' }
+            },
+            yPct: {
+              type: 'linear',
+              position: 'right',
+              beginAtZero: true,
+              max: 100,
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: '% of Daily Log' }
+            }
+          }
+        }
+      });
+
+      // 3. Billing Year Monthly Breakdown (Stacked June -> May)
+      const toFiscalIdx = m => (m >= 5 ? m - 5 : m + 7);
+      const mBillable = Array(12).fill(0);
+      const mProBono = Array(12).fill(0);
+      const mNonBillable = Array(12).fill(0);
+
+      data.forEach(r => {
+        const fIdx = toFiscalIdx(r.date.getMonth());
+        mBillable[fIdx] += r.billable;
+        mProBono[fIdx] += r.proBono;
+        mNonBillable[fIdx] += r.nonBillable;
+      });
+
+      chartInstances.monthly = new Chart(document.getElementById('monthlyChart'), {
+        type: 'bar',
+        data: {
+          labels: FISCAL_MONTHS,
+          datasets: [
+            { label: 'Billable', data: mBillable, backgroundColor: '#4f46e5' },
+            { label: 'Pro Bono', data: mProBono, backgroundColor: '#06b6d4' },
+            { label: 'Non-Billable', data: mNonBillable, backgroundColor: '#f59e0b' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+        }
+      });
+
+      // 4. Day of Week Distribution
+      const dowLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dowHours = Array(7).fill(0);
+
+      data.forEach(r => {
+        dowHours[r.date.getDay()] += (r.billable + r.proBono);
+      });
+
+      chartInstances.dow = new Chart(document.getElementById('dowChart'), {
+        type: 'bar',
+        data: {
+          labels: dowLabels,
+          datasets: [{
+            label: 'Billable + Pro Bono Hours',
+            data: dowHours,
+            backgroundColor: '#818cf8'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
