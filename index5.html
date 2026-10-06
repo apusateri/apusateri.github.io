@@ -4,17 +4,13 @@
   <meta charset="UTF-8" />
   <title>Hours & Bonus Tracker (June 1 - May 31)</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- PapaParse for CSV parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <!-- SheetJS for Excel (.xlsx / .xls) parsing -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Chart.js for visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased p-6">
   <div class="max-w-7xl mx-auto space-y-6">
 
-    <!-- Header & File Ingestion -->
+    <!-- Header & CSV Ingestion -->
     <header class="bg-white rounded-xl shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200">
       <div>
         <h1 class="text-2xl font-bold text-slate-900">Annual Hours & Bonus Tracker</h1>
@@ -25,8 +21,8 @@
       </div>
       <div>
         <label class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm cursor-pointer transition">
-          <span>Upload File (CSV / Excel)</span>
-          <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" class="hidden" />
+          <span>Upload CSV</span>
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
         </label>
       </div>
     </header>
@@ -36,7 +32,7 @@
       <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
       </svg>
-      <p class="text-base font-semibold">Upload your tracking CSV or Excel spreadsheet to view reports</p>
+      <p class="text-base font-semibold">Upload your tracking CSV to view reports</p>
       <p class="text-xs text-slate-400 mt-1">Expected columns: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours</p>
     </div>
 
@@ -226,57 +222,15 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      const fileName = file.name.toLowerCase();
-
-      // Excel Spreadsheet Handling (.xlsx, .xls)
-      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: 0 });
-
-            // Normalize column headers to lowercase and convert Date instances
-            const normalizedRows = rawRows.map(row => {
-              const clean = {};
-              for (const [k, v] of Object.entries(row)) {
-                const cleanKey = k.trim().toLowerCase();
-                if (v instanceof Date) {
-                  // Adjust for UTC offset representation if needed
-                  const y = v.getFullYear();
-                  const m = String(v.getMonth() + 1).padStart(2, '0');
-                  const d = String(v.getDate()).padStart(2, '0');
-                  clean[cleanKey] = `${y}-${m}-${d}`;
-                } else {
-                  clean[cleanKey] = v;
-                }
-              }
-              return clean;
-            });
-
-            processData(normalizedRows);
-          } catch (err) {
-            alert('Failed to parse Excel file. Please ensure it is a valid .xlsx or .xls file.');
-            console.error(err);
-          }
-        };
-        reader.readAsArrayBuffer(file);
-
-      // CSV Handling
-      } else {
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: true,
-          dynamicTyping: true,
-          transformHeader: h => h.trim().toLowerCase(),
-          complete: function(results) {
-            processData(results.data);
-          }
-        });
-      }
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: true,
+        transformHeader: h => h.trim().toLowerCase(),
+        complete: function(results) {
+          processData(results.data);
+        }
+      });
     }
 
     function formatDateKey(d) {
@@ -295,6 +249,7 @@
     }
 
     function processData(rows) {
+      // 1. Ingest rows into a map indexed by YYYY-MM-DD
       const rawMap = new Map();
       let earliestCsvDate = null;
       let latestCsvDate = null;
@@ -318,14 +273,14 @@
       });
 
       if (rawMap.size === 0) {
-        alert('No valid date entries found in file. Please verify column headers: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours.');
+        alert('No valid dates found in CSV. Please verify column headers: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours.');
         return;
       }
 
       document.getElementById('uploadPrompt').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
 
-      // Base billing year cycle on TODAY's date
+      // 2. Base billing year cycle on TODAY's date
       const today = new Date();
       const todayYear = today.getFullYear();
       const todayMonth = today.getMonth(); // 0 = Jan, 5 = June
@@ -338,7 +293,7 @@
       document.getElementById('lblBillingCycle').innerText = 
         `June 1, ${cycleStartYear} – May 31, ${cycleEndYear}`;
 
-      // Fill missing dates with 0.0 hours from June 1 through max(today, latestUploadedDate)
+      // 3. Fill missing dates with 0.0 hours from June 1 up to max(today, latestCsvDate)
       const fillEndDate = latestCsvDate && latestCsvDate > today ? latestCsvDate : today;
       const cleanData = [];
 
@@ -441,6 +396,7 @@
         const monthStart = new Date(calYear, calMonth, 1);
         const monthEnd = new Date(calYear, calMonth + 1, 0);
 
+        // Do not render months strictly in the future of today
         if (monthStart > today) break;
 
         const isCurrentMonth = (today.getFullYear() === calYear && today.getMonth() === calMonth);
