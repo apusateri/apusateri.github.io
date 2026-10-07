@@ -10,11 +10,30 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Chart.js for visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @media print {
+      body { background-color: #ffffff; padding: 0; }
+      header button, header label, header div:has(#salaryInput), #helpBtn, #printBtn, #modalOverlay {
+        display: none !important;
+      }
+      .no-print { display: none !important; }
+      .shadow-sm, .border { box-shadow: none !important; border-color: #cbd5e1 !important; }
+      main { margin-top: 0 !important; }
+    }
+  </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased p-6">
   <div class="max-w-7xl mx-auto space-y-6">
 
-    <!-- Header & File Ingestion -->
+    <!-- Top Legal Disclaimer Notice -->
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-3.5 rounded-r-lg shadow-xs text-xs text-amber-900 no-print flex items-start justify-between gap-3">
+      <div>
+        <span class="font-bold uppercase tracking-wider">Disclaimer & Terms of Use:</span>
+        This utility is an independent calculation tool and is not an officially sanctioned product of any firm or employer. It is intended solely for personal verification and cross-validation against personal time logs. By using this tool, you expressly acknowledge and agree that the projections, hours, and bonus tiers displayed herein will not be relied upon in any official capacity or as definitive records for compensation determinations.
+      </div>
+    </div>
+
+    <!-- Header & File Ingestion Toolbar -->
     <header class="bg-white rounded-xl shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200">
       <div>
         <h1 class="text-2xl font-bold text-slate-900">Annual Hours & Bonus Tracker</h1>
@@ -23,37 +42,77 @@
           Base: 1,850 hrs &bull; Bonus: 1,950+ hrs (Pro Bono capped at 3% credit)
         </p>
       </div>
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2.5">
         <!-- Salary Input -->
-        <div class="flex items-center gap-2 bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 shadow-sm">
+        <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 shadow-sm">
           <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Salary:</span>
           <div class="relative flex items-center">
-            <span class="text-slate-400 text-sm mr-1">$</span>
+            <span class="text-slate-400 text-xs mr-0.5">$</span>
             <input 
               type="number" 
               id="salaryInput" 
               placeholder="100000"
               step="1000"
-              class="w-28 bg-transparent text-sm font-bold text-slate-800 focus:outline-none"
+              class="w-24 bg-transparent text-sm font-bold text-slate-800 focus:outline-none"
               title="Enter your annual base salary to view bonus projections"
             />
           </div>
         </div>
 
-        <label class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm cursor-pointer transition">
-          <span>Upload File (CSV / Excel)</span>
+        <!-- Help Button -->
+        <button 
+          id="helpBtn"
+          type="button"
+          class="inline-flex items-center px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg transition"
+          title="File specifications, template download, and privacy information"
+        >
+          <svg class="w-4 h-4 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Help & Template
+        </button>
+
+        <!-- Save / Print Report Button -->
+        <button 
+          id="printBtn"
+          type="button"
+          class="inline-flex items-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg shadow-sm transition"
+          title="Print or export current dashboard calculations as a PDF report"
+        >
+          <svg class="w-4 h-4 mr-1 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Save Report
+        </button>
+
+        <!-- Upload File Button -->
+        <label class="inline-flex items-center px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shadow-sm cursor-pointer transition">
+          <span>Upload File</span>
           <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" class="hidden" />
         </label>
       </div>
     </header>
 
-    <!-- Empty State -->
-    <div id="uploadPrompt" class="bg-white border-2 border-dashed border-slate-300 rounded-xl p-12 text-center text-slate-500">
-      <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Empty State Prompt -->
+    <div id="uploadPrompt" class="bg-white border-2 border-dashed border-slate-300 rounded-xl p-12 text-center text-slate-500 space-y-3">
+      <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
       </svg>
-      <p class="text-base font-semibold">Upload your tracking CSV or Excel spreadsheet to view reports</p>
-      <p class="text-xs text-slate-400 mt-1">Expected columns: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours</p>
+      <p class="text-base font-semibold text-slate-700">Upload your tracking CSV or Excel spreadsheet to generate report</p>
+      <p class="text-xs text-slate-400 max-w-lg mx-auto">
+        Expected columns: Date, Billable Hours, Pro Bono Hours, Non-Billable Hours. Need a starting file? Click below to download a blank template.
+      </p>
+      <div>
+        <button onclick="downloadSampleTemplate()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline">
+          Download Sample Template (.CSV)
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Report Snapshot Header (Shown in Print/PDF Mode) -->
+    <div id="printHeaderStamp" class="hidden print:block border-b border-slate-200 pb-2 mb-4 text-xs text-slate-500">
+      <span class="font-bold text-slate-800">Hours Tracking & Pacing Snapshot</span> &bull; 
+      Generated: <span id="reportGeneratedStamp"></span> &bull; Status as of: <span id="reportAsOfDateStamp"></span>
     </div>
 
     <!-- Dashboard Content -->
@@ -347,7 +406,86 @@
         </div>
       </section>
 
+      <!-- Footer Disclaimer Notice -->
+      <footer class="pt-6 pb-2 text-center text-xs text-slate-400 border-t border-slate-200">
+        <p>This report is for unofficial personal tracking and simulation only. Pro bono caps (3%) and bonus tiers reflect estimated calculations.</p>
+        <p class="mt-0.5">Use of this tool is subject to the agreement that data is not relied upon in an official capacity.</p>
+      </footer>
+
     </main>
+  </div>
+
+  <!-- Help & Template Modal -->
+  <div id="modalOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden no-print">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-lg font-bold text-slate-900">Tracker Guide & Privacy Information</h3>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- File Specification -->
+      <div class="space-y-2 text-xs text-slate-600">
+        <h4 class="font-bold text-slate-800 uppercase tracking-wide text-[11px]">1. Expected File Format</h4>
+        <p>The dashboard accepts plain-text CSV files (<code>.csv</code>) or Excel spreadsheets (<code>.xlsx</code> / <code>.xls</code>). Your file must include a header row with the following column names (order is flexible, case-insensitive):</p>
+        
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono text-[11px] text-slate-700 overflow-x-auto">
+          Date, Billable Hours, Pro Bono Hours, Non-Billable Hours
+        </div>
+
+        <ul class="list-disc list-inside space-y-1 pl-1 text-[11px] text-slate-500">
+          <li><strong>Date:</strong> Acceptable as <code>YYYY-MM-DD</code> or <code>MM/DD/YYYY</code>.</li>
+          <li><strong>Numeric Hours:</strong> Decimal format (e.g. <code>7.5</code>, <code>2.0</code>). Days without entries are assumed to be <code>0.0</code> hours.</li>
+          <li><strong>Cycle Range:</strong> The dashboard expects dates starting June 1 of the billing year through May 31.</li>
+        </ul>
+      </div>
+
+      <!-- Sample Template Download -->
+      <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h5 class="text-xs font-bold text-indigo-900">Need a starter template?</h5>
+          <p class="text-[11px] text-indigo-700">Download a pre-formatted CSV template with headers and sample entries.</p>
+        </div>
+        <button 
+          onclick="downloadSampleTemplate()"
+          class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-xs transition whitespace-nowrap"
+        >
+          Download Template
+        </button>
+      </div>
+
+      <!-- Client-Side Privacy Certification -->
+      <div class="space-y-2 text-xs text-slate-600">
+        <h4 class="font-bold text-slate-800 uppercase tracking-wide text-[11px] flex items-center gap-1.5 text-emerald-800">
+          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          2. Privacy Certification & Data Safety
+        </h4>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5 text-[11px] text-slate-600">
+          <p><strong>100% Client-Side Execution:</strong> Your uploaded files, time entries, hours, and entered salary figures are processed exclusively in memory within your web browser using HTML5 FileReaders.</p>
+          <p><strong>Zero Server Storage:</strong> No data is transmitted to an external server, backend database, cloud storage, or third party. Refreshing or closing the tab destroys all parsed data from memory.</p>
+        </div>
+      </div>
+
+      <!-- Legal Agreement -->
+      <div class="space-y-1 text-[11px] text-slate-400 border-t border-slate-100 pt-3">
+        <p class="font-semibold text-slate-500">Legal Agreement:</p>
+        <p>This tool is not officially sanctioned. Use is strictly limited to personal cross-validation and simulation. By using this tool, you agree that neither the calculations nor the charts will be relied upon in an official capacity or in lieu of firm timekeeping systems.</p>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button 
+          id="closeModalFooterBtn"
+          class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-medium text-xs rounded-lg transition"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -401,6 +539,44 @@
     });
 
     document.getElementById('csvFileInput').addEventListener('change', handleFileUpload);
+
+    // Modal Handlers
+    const modalOverlay = document.getElementById('modalOverlay');
+    document.getElementById('helpBtn').addEventListener('click', () => modalOverlay.classList.remove('hidden'));
+    document.getElementById('closeModalBtn').addEventListener('click', () => modalOverlay.classList.add('hidden'));
+    document.getElementById('closeModalFooterBtn').addEventListener('click', () => modalOverlay.classList.add('hidden'));
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) modalOverlay.classList.add('hidden');
+    });
+
+    // Save/Print Handlers
+    document.getElementById('printBtn').addEventListener('click', () => {
+      const today = new Date();
+      document.getElementById('reportGeneratedStamp').innerText = today.toLocaleString();
+      document.getElementById('reportAsOfDateStamp').innerText = today.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      window.print();
+    });
+
+    // Download Sample CSV Helper
+    function downloadSampleTemplate() {
+      const csvContent = 
+`Date,Billable Hours,Pro Bono Hours,Non-Billable Hours
+2025-06-02,7.5,0.0,1.0
+2025-06-03,8.0,0.5,0.5
+2025-06-04,6.5,1.0,1.5
+2025-06-05,7.0,0.0,0.5
+2025-06-06,8.2,0.0,0.0`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'hours_template.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
 
     function parseFlexDate(dateVal) {
       if (!dateVal) return null;
@@ -820,7 +996,6 @@
         const currentEnd = runningDeltaCumulative;
 
         deltaChartLabels.push(monthLabel);
-        // Floating bar: [start, end]
         deltaChartRanges.push([Number(priorEnd.toFixed(1)), Number(currentEnd.toFixed(1))]);
         deltaChartColors.push(baseDelta >= 0 ? '#10b981' : '#ef4444');
         deltaChartRawDeltas.push(Number(baseDelta.toFixed(1)));
