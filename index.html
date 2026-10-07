@@ -20,10 +20,26 @@
         <h1 class="text-2xl font-bold text-slate-900">Annual Hours & Bonus Tracker</h1>
         <p class="text-sm text-slate-500">
           Billing Year: <strong id="lblBillingCycle" class="text-slate-700">June 1 &ndash; May 31</strong> &bull; 
-          Base: 1,850 hrs &bull; Bonus: 1,950 hrs (Pro Bono capped at 3% credit)
+          Base: 1,850 hrs &bull; Bonus: 1,950+ hrs (Pro Bono capped at 3% credit)
         </p>
       </div>
-      <div>
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Salary Input (No default) -->
+        <div class="flex items-center gap-2 bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 shadow-sm">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Salary:</span>
+          <div class="relative flex items-center">
+            <span class="text-slate-400 text-sm mr-1">$</span>
+            <input 
+              type="number" 
+              id="salaryInput" 
+              placeholder="e.g. 265000"
+              step="1000"
+              class="w-28 bg-transparent text-sm font-bold text-slate-800 focus:outline-none"
+              title="Enter your annual base salary to view bonus projections"
+            />
+          </div>
+        </div>
+
         <label class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm cursor-pointer transition">
           <span>Upload File (CSV / Excel)</span>
           <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" class="hidden" />
@@ -43,43 +59,149 @@
     <!-- Dashboard Content -->
     <main id="dashboard" class="space-y-6 hidden">
 
-      <!-- Targets Summary: 1,850 vs 1,950 -->
-      <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- 1,850 Base Card -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Base Target (1,850 hrs)</span>
-            <span id="basePctDone" class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">0%</span>
+      <!-- Combined Targets Summary Card (Base 1,850 & Bonus 1,950) -->
+      <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-baseline justify-between pb-4 border-b border-slate-100 gap-2">
+          <div>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Qualifying Hours Pacing</span>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span id="kpiTotalCredit" class="text-4xl font-extrabold text-slate-900">0.0</span>
+              <span class="text-sm font-medium text-slate-500">credit hours logged</span>
+            </div>
           </div>
-          <div class="mt-3 flex items-baseline gap-2">
-            <span id="kpiBaseCredit" class="text-3xl font-extrabold text-slate-900">0.0</span>
-            <span class="text-sm text-slate-400">/ 1,850 credit hrs</span>
-          </div>
-          <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
-            <div id="baseProgressBar" class="bg-indigo-600 h-2 rounded-full" style="width: 0%"></div>
-          </div>
-          <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
-            <span>Remaining: <strong id="kpiBaseRemaining" class="text-slate-800">1,850</strong> hrs</span>
-            <span>Required Rate: <strong id="kpiBaseRunRate" class="text-indigo-600">0.00</strong> hrs/day</span>
+          <div class="text-xs text-slate-400">
+            Billable: <strong id="kpiPureBillable" class="text-slate-700">0.0</strong> &bull; 
+            Credited PB: <strong id="kpiProBonoCredited" class="text-slate-700">0.0</strong> 
+            (<span id="kpiProBonoExcess">0.0</span> uncredited)
           </div>
         </div>
 
-        <!-- 1,950 Bonus Card -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Bonus Threshold (1,950 hrs)</span>
-            <span id="bonusPctDone" class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">0%</span>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-5">
+          <!-- Base Target (1,850) Column -->
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-bold text-slate-700 uppercase tracking-wide">Base Target (1,850 hrs)</span>
+              <span id="basePctDone" class="font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">0.0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+              <div id="baseProgressBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-slate-500 pt-1">
+              <span>Remaining: <strong id="kpiBaseRemaining" class="text-slate-800">1,850.0</strong> hrs</span>
+              <span>Need: <strong id="kpiBaseRunRate" class="text-indigo-600">0.00</strong> hrs/day</span>
+            </div>
           </div>
-          <div class="mt-3 flex items-baseline gap-2">
-            <span id="kpiBonusCredit" class="text-3xl font-extrabold text-slate-900">0.0</span>
-            <span class="text-sm text-slate-400">/ 1,950 credit hrs</span>
+
+          <!-- Bonus Target (1,950) Column -->
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-bold text-slate-700 uppercase tracking-wide">Bonus Threshold (1,950 hrs)</span>
+              <span id="bonusPctDone" class="font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">0.0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+              <div id="bonusProgressBar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-slate-500 pt-1">
+              <span>Remaining: <strong id="kpiBonusRemaining" class="text-slate-800">1,950.0</strong> hrs</span>
+              <span>Need: <strong id="kpiBonusRunRate" class="text-emerald-600">0.00</strong> hrs/day</span>
+            </div>
           </div>
-          <div class="w-full bg-slate-100 rounded-full h-2 mt-3 overflow-hidden">
-            <div id="bonusProgressBar" class="bg-emerald-500 h-2 rounded-full" style="width: 0%"></div>
+        </div>
+      </section>
+
+      <!-- Forecast Section -->
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Forecast Run Rate Card -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Year-End Run Rate Forecast</h2>
+              <span class="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                <span id="fcMonthsRemaining">0</span> Mos Rem.
+              </span>
+            </div>
+            
+            <div class="space-y-3 divide-y divide-slate-100 text-xs">
+              <!-- Raw Billable -->
+              <div class="pt-2">
+                <div class="flex justify-between items-baseline mb-1">
+                  <span class="font-medium text-slate-700">Raw Billable</span>
+                  <span class="text-xs font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded" id="fcRawAnnualized">0.0 hrs</span>
+                </div>
+                <div class="text-[11px] text-slate-500 flex justify-between">
+                  <span>Req/Day: <strong id="fcRawPerDay" class="text-slate-700">0.0</strong></span>
+                  <span>Req/Weekday: <strong id="fcRawPerWD" class="text-slate-700">0.0</strong></span>
+                  <span class="text-slate-400 italic">No Pro Bono</span>
+                </div>
+              </div>
+
+              <!-- Billable + PB (3% Cap) -->
+              <div class="pt-2">
+                <div class="flex justify-between items-baseline mb-1">
+                  <span class="font-medium text-slate-700">Credited (PB Capped at 3%)</span>
+                  <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded" id="fcCreditedAnnualized">0.0 hrs</span>
+                </div>
+                <div class="text-[11px] text-slate-500 flex justify-between">
+                  <span>Req/Day: <strong id="fcCreditedPerDay" class="text-slate-700">0.0</strong></span>
+                  <span>Req/Weekday: <strong id="fcCreditedPerWD" class="text-slate-700">0.0</strong></span>
+                  <span class="text-slate-400 italic">3% Pro Bono Cap</span>
+                </div>
+              </div>
+
+              <!-- Total Gross Credit Hours -->
+              <div class="pt-2">
+                <div class="flex justify-between items-baseline mb-1">
+                  <span class="font-medium text-slate-700">Gross (All PB Included)</span>
+                  <span class="text-xs font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded" id="fcGrossAnnualized">0.0 hrs</span>
+                </div>
+                <div class="text-[11px] text-slate-500 flex justify-between">
+                  <span>Req/Day: <strong id="fcGrossPerDay" class="text-slate-700">0.0</strong></span>
+                  <span>Req/Weekday: <strong id="fcGrossPerWD" class="text-slate-700">0.0</strong></span>
+                  <span class="text-slate-400 italic">Includes All PB</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
-            <span>Remaining: <strong id="kpiBonusRemaining" class="text-slate-800">1,950</strong> hrs</span>
-            <span>Required Rate: <strong id="kpiBonusRunRate" class="text-emerald-600">0.00</strong> hrs/day</span>
+
+          <!-- Anticipated Bonus Box (Visible only when salary is entered) -->
+          <div id="anticipatedBonusBox" class="mt-4 pt-3 border-t border-slate-100 bg-slate-50/80 -mx-5 -mb-5 p-4 rounded-b-xl hidden">
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Anticipated Bonus Status</div>
+            <div class="flex items-baseline justify-between">
+              <span id="anticipatedTierName" class="text-base font-bold text-slate-800">Below Bonus (1,850)</span>
+              <span id="anticipatedBonusDollars" class="text-xl font-extrabold text-emerald-600">$0.00</span>
+            </div>
+            <p id="anticipatedBonusPct" class="text-[11px] text-slate-400 mt-0.5">0.00% of salary based on annualized credited pace</p>
+          </div>
+        </div>
+
+        <!-- Full Bonus Tier Schedule Table (Visible only when salary is entered) -->
+        <div id="bonusScheduleCard" class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hidden">
+          <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+            <div>
+              <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wide">Bonus Tiers & Projected Payout</h2>
+              <p class="text-[11px] text-slate-400">Tiers start at 1,850 hours. Highlighted row indicates current annualized pace.</p>
+            </div>
+            <div class="text-xs text-right">
+              Base Salary: <strong id="lblDisplaySalary" class="text-slate-900">$0</strong>
+            </div>
+          </div>
+          
+          <div class="overflow-x-auto max-h-[300px] overflow-y-auto">
+            <table class="min-w-full divide-y divide-slate-100 text-left text-xs">
+              <thead class="bg-slate-50 text-[11px] font-semibold text-slate-600 sticky top-0 uppercase tracking-wider">
+                <tr>
+                  <th class="px-3 py-2">Target</th>
+                  <th class="px-3 py-2 text-right">Bonus ($)</th>
+                  <th class="px-3 py-2 text-right">% Salary</th>
+                  <th class="px-3 py-2 text-right">Change ($)</th>
+                  <th class="px-3 py-2 text-right">$/Hour</th>
+                  <th class="px-3 py-2 text-right">Total $/Hour</th>
+                </tr>
+              </thead>
+              <tbody id="bonusTableBody" class="divide-y divide-slate-100">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -218,9 +340,75 @@
     const BASE_TARGET = 1850;
     const BONUS_TARGET = 1950;
     const FISCAL_MONTHS = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+    
+    const BONUS_TIERS = [
+      { hours: 1850, pct: 0.0200 },
+      { hours: 1875, pct: 0.0300 },
+      { hours: 1900, pct: 0.0425 },
+      { hours: 1925, pct: 0.0550 },
+      { hours: 1950, pct: 0.0675 },
+      { hours: 1975, pct: 0.0800 },
+      { hours: 2000, pct: 0.0950 },
+      { hours: 2025, pct: 0.1100 },
+      { hours: 2050, pct: 0.1250 },
+      { hours: 2075, pct: 0.1400 },
+      { hours: 2100, pct: 0.1600 },
+      { hours: 2125, pct: 0.1800 },
+      { hours: 2150, pct: 0.2000 },
+      { hours: 2175, pct: 0.2200 },
+      { hours: 2200, pct: 0.2400 },
+      { hours: 2225, pct: 0.2600 },
+      { hours: 2250, pct: 0.2800 },
+      { hours: 2275, pct: 0.3000 }
+    ];
+
     let chartInstances = {};
+    let activeCleanData = null;
+    let activeCycleEnd = null;
+    let activeCycleStartYear = null;
+
+    // Load saved salary if previously entered by the user
+    const salaryInput = document.getElementById('salaryInput');
+    const savedSalary = localStorage.getItem('user_salary');
+    if (savedSalary) {
+      salaryInput.value = savedSalary;
+    }
+
+    salaryInput.addEventListener('input', () => {
+      const val = salaryInput.value.trim();
+      if (val) {
+        localStorage.setItem('user_salary', val);
+      } else {
+        localStorage.removeItem('user_salary');
+      }
+      if (activeCleanData) {
+        calculateBonusForecast(activeCleanData, activeCycleEnd, new Date(), activeCycleStartYear);
+      }
+    });
 
     document.getElementById('csvFileInput').addEventListener('change', handleFileUpload);
+
+    function parseFlexDate(dateVal) {
+      if (!dateVal) return null;
+      if (dateVal instanceof Date) return isNaN(dateVal.getTime()) ? null : dateVal;
+
+      const str = String(dateVal).trim().split('T')[0];
+
+      // YYYY-MM-DD or YYYY/MM/DD
+      if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(str)) {
+        const parts = str.split(/[-/]/).map(Number);
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+
+      // MM/DD/YYYY or M/D/YYYY
+      if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(str)) {
+        const parts = str.split(/[-/]/).map(Number);
+        return new Date(parts[2], parts[0] - 1, parts[1]);
+      }
+
+      const fallback = new Date(str);
+      return isNaN(fallback.getTime()) ? null : fallback;
+    }
 
     function handleFileUpload(event) {
       const file = event.target.files[0];
@@ -228,7 +416,6 @@
 
       const fileName = file.name.toLowerCase();
 
-      // Excel Spreadsheet Handling (.xlsx, .xls)
       if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -239,13 +426,11 @@
             const worksheet = workbook.Sheets[firstSheetName];
             const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: 0 });
 
-            // Normalize column headers to lowercase and convert Date instances
             const normalizedRows = rawRows.map(row => {
               const clean = {};
               for (const [k, v] of Object.entries(row)) {
-                const cleanKey = k.trim().toLowerCase();
+                const cleanKey = k.replace(/^\uFEFF/, '').trim().toLowerCase();
                 if (v instanceof Date) {
-                  // Adjust for UTC offset representation if needed
                   const y = v.getFullYear();
                   const m = String(v.getMonth() + 1).padStart(2, '0');
                   const d = String(v.getDate()).padStart(2, '0');
@@ -265,13 +450,12 @@
         };
         reader.readAsArrayBuffer(file);
 
-      // CSV Handling
       } else {
         Papa.parse(file, {
           header: true,
           skipEmptyLines: true,
           dynamicTyping: true,
-          transformHeader: h => h.trim().toLowerCase(),
+          transformHeader: h => h.replace(/^\uFEFF/, '').trim().toLowerCase(),
           complete: function(results) {
             processData(results.data);
           }
@@ -294,25 +478,44 @@
       return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }
 
+    function countWeekdays(startDate, endDate) {
+      if (startDate > endDate) return 0;
+      let count = 0;
+      let cur = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      const last = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      while (cur <= last) {
+        const d = cur.getDay();
+        if (d !== 0 && d !== 6) count++;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return count;
+    }
+
     function processData(rows) {
       const rawMap = new Map();
       let earliestCsvDate = null;
       let latestCsvDate = null;
 
       rows.forEach(r => {
-        const dateVal = r['date'] || r['entry_date'] || '';
-        if (!dateVal) return;
-        const [year, month, day] = String(dateVal).split('T')[0].split('-').map(Number);
-        const parsedDate = new Date(year, (month || 1) - 1, day || 1);
-        if (isNaN(parsedDate.getTime())) return;
+        const getVal = (keys) => {
+          for (const k of Object.keys(r)) {
+            const cleanKey = k.replace(/^\uFEFF/, '').trim().toLowerCase();
+            if (keys.includes(cleanKey)) return r[k];
+          }
+          return undefined;
+        };
+
+        const dateVal = getVal(['date', 'entry_date', 'date worked', 'work date']);
+        const parsedDate = parseFlexDate(dateVal);
+        if (!parsedDate) return;
 
         if (!earliestCsvDate || parsedDate < earliestCsvDate) earliestCsvDate = parsedDate;
         if (!latestCsvDate || parsedDate > latestCsvDate) latestCsvDate = parsedDate;
 
         const dateKey = formatDateKey(parsedDate);
-        const b = Number(r['billable hours'] || r['billable'] || 0);
-        const pb = Number(r['pro bono hours'] || r['pro bono'] || r['pro_bono'] || 0);
-        const nb = Number(r['non-billable hours'] || r['non-billable'] || r['non_billable'] || 0);
+        const b = Number(getVal(['billable hours', 'billable', 'billable hrs']) || 0);
+        const pb = Number(getVal(['pro bono hours', 'pro bono', 'pro_bono', 'probono']) || 0);
+        const nb = Number(getVal(['non-billable hours', 'non-billable', 'non_billable', 'nonbillable']) || 0);
 
         rawMap.set(dateKey, { billable: b, proBono: pb, nonBillable: nb });
       });
@@ -325,7 +528,6 @@
       document.getElementById('uploadPrompt').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
 
-      // Base billing year cycle on TODAY's date
       const today = new Date();
       const todayYear = today.getFullYear();
       const todayMonth = today.getMonth(); // 0 = Jan, 5 = June
@@ -338,7 +540,6 @@
       document.getElementById('lblBillingCycle').innerText = 
         `June 1, ${cycleStartYear} – May 31, ${cycleEndYear}`;
 
-      // Fill missing dates with 0.0 hours from June 1 through max(today, latestUploadedDate)
       const fillEndDate = latestCsvDate && latestCsvDate > today ? latestCsvDate : today;
       const cleanData = [];
 
@@ -364,7 +565,12 @@
         cur.setDate(cur.getDate() + 1);
       }
 
+      activeCleanData = cleanData;
+      activeCycleEnd = cycleEnd;
+      activeCycleStartYear = cycleStartYear;
+
       calculateMetrics(cleanData, cycleEnd, today);
+      calculateBonusForecast(cleanData, cycleEnd, today, cycleStartYear);
       generateMonthlySections(cleanData, cycleStartYear, today);
       renderCharts(cleanData, cycleEnd);
     }
@@ -375,6 +581,7 @@
 
       const maxAllowedProBono = totalBillable * (0.03 / 0.97);
       const creditedProBono = Math.min(totalProBono, maxAllowedProBono);
+      const excessProBono = Math.max(0, totalProBono - creditedProBono);
       const totalCredit = totalBillable + creditedProBono;
 
       const baseRemaining = Math.max(0, BASE_TARGET - totalCredit);
@@ -388,17 +595,139 @@
       const baseRunRate = daysRemaining > 0 ? (baseRemaining / daysRemaining).toFixed(2) : '0.00';
       const bonusRunRate = daysRemaining > 0 ? (bonusRemaining / daysRemaining).toFixed(2) : '0.00';
 
-      document.getElementById('kpiBaseCredit').innerText = totalCredit.toFixed(1);
+      // Unified Target Card Updates
+      document.getElementById('kpiTotalCredit').innerText = totalCredit.toFixed(1);
+      document.getElementById('kpiPureBillable').innerText = totalBillable.toFixed(1);
+      document.getElementById('kpiProBonoCredited').innerText = creditedProBono.toFixed(1);
+      document.getElementById('kpiProBonoExcess').innerText = excessProBono.toFixed(1);
+
       document.getElementById('baseProgressBar').style.width = `${basePct.toFixed(1)}%`;
       document.getElementById('basePctDone').innerText = `${basePct.toFixed(1)}%`;
       document.getElementById('kpiBaseRemaining').innerText = baseRemaining.toFixed(1);
       document.getElementById('kpiBaseRunRate').innerText = baseRunRate;
 
-      document.getElementById('kpiBonusCredit').innerText = totalCredit.toFixed(1);
       document.getElementById('bonusProgressBar').style.width = `${bonusPct.toFixed(1)}%`;
       document.getElementById('bonusPctDone').innerText = `${bonusPct.toFixed(1)}%`;
       document.getElementById('kpiBonusRemaining').innerText = bonusRemaining.toFixed(1);
       document.getElementById('kpiBonusRunRate').innerText = bonusRunRate;
+    }
+
+    function calculateBonusForecast(data, endOfBillingCycle, today, cycleStartYear) {
+      const rawSalary = document.getElementById('salaryInput').value.trim();
+      const salary = parseFloat(rawSalary);
+      const hasSalary = !isNaN(salary) && salary > 0;
+
+      const anticipatedBox = document.getElementById('anticipatedBonusBox');
+      const bonusScheduleCard = document.getElementById('bonusScheduleCard');
+
+      if (!hasSalary) {
+        anticipatedBox.classList.add('hidden');
+        bonusScheduleCard.classList.add('hidden');
+      } else {
+        anticipatedBox.classList.remove('hidden');
+        bonusScheduleCard.classList.remove('hidden');
+        document.getElementById('lblDisplaySalary').innerText = `$${salary.toLocaleString()}`;
+      }
+
+      const cycleStart = new Date(cycleStartYear, 5, 1);
+      const totalCycleDays = countCalendarDays(cycleStart, endOfBillingCycle) || 365;
+
+      const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+      const remainingDays = countCalendarDays(tomorrow, endOfBillingCycle);
+      const remainingWD = countWeekdays(tomorrow, endOfBillingCycle);
+      const elapsedDays = Math.max(1, countCalendarDays(cycleStart, today));
+
+      const currentMonth = today.getMonth(); // 0 = Jan, 4 = May
+      let monthsRemaining = (4 - currentMonth + 12) % 12;
+      document.getElementById('fcMonthsRemaining').innerText = monthsRemaining;
+
+      // 1. Totals
+      const totalBillable = data.reduce((acc, r) => acc + r.billable, 0);
+      const totalProBono = data.reduce((acc, r) => acc + r.proBono, 0);
+
+      const maxPBAllowed = totalBillable * (0.03 / 0.97);
+      const totalCredited = totalBillable + Math.min(totalProBono, maxPBAllowed);
+      const totalGross = totalBillable + totalProBono;
+
+      // 2. Annualized Run-Rates
+      const rawAnnualized = (totalBillable / elapsedDays) * totalCycleDays;
+      const creditedAnnualized = (totalCredited / elapsedDays) * totalCycleDays;
+      const grossAnnualized = (totalGross / elapsedDays) * totalCycleDays;
+
+      document.getElementById('fcRawAnnualized').innerText = `${rawAnnualized.toFixed(1)} hrs`;
+      document.getElementById('fcCreditedAnnualized').innerText = `${creditedAnnualized.toFixed(1)} hrs`;
+      document.getElementById('fcGrossAnnualized').innerText = `${grossAnnualized.toFixed(1)} hrs`;
+
+      // 3. Daily and WD Required Rates for 1,850 Target
+      const remRaw = Math.max(0, BASE_TARGET - totalBillable);
+      const remCredited = Math.max(0, BASE_TARGET - totalCredited);
+      const remGross = Math.max(0, BASE_TARGET - totalGross);
+
+      document.getElementById('fcRawPerDay').innerText = remainingDays > 0 ? (remRaw / remainingDays).toFixed(1) : '0.0';
+      document.getElementById('fcRawPerWD').innerText = remainingWD > 0 ? (remRaw / remainingWD).toFixed(1) : '0.0';
+
+      document.getElementById('fcCreditedPerDay').innerText = remainingDays > 0 ? (remCredited / remainingDays).toFixed(1) : '0.0';
+      document.getElementById('fcCreditedPerWD').innerText = remainingWD > 0 ? (remCredited / remainingWD).toFixed(1) : '0.0';
+
+      document.getElementById('fcGrossPerDay').innerText = remainingDays > 0 ? (remGross / remainingDays).toFixed(1) : '0.0';
+      document.getElementById('fcGrossPerWD').innerText = remainingWD > 0 ? (remGross / remainingWD).toFixed(1) : '0.0';
+
+      if (!hasSalary) return;
+
+      // 4. Determine Anticipated Tier
+      let matchedTier = null;
+      for (let i = BONUS_TIERS.length - 1; i >= 0; i--) {
+        if (creditedAnnualized >= BONUS_TIERS[i].hours) {
+          matchedTier = BONUS_TIERS[i];
+          break;
+        }
+      }
+
+      if (matchedTier) {
+        const bonusDollars = salary * matchedTier.pct;
+        document.getElementById('anticipatedTierName').innerText = `${matchedTier.hours.toLocaleString()} Tier`;
+        document.getElementById('anticipatedBonusDollars').innerText = `$${bonusDollars.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        document.getElementById('anticipatedBonusPct').innerText = `${(matchedTier.pct * 100).toFixed(2)}% of salary based on annualized pace`;
+      } else {
+        document.getElementById('anticipatedTierName').innerText = 'Below 1,850 (No Bonus)';
+        document.getElementById('anticipatedBonusDollars').innerText = '$0.00';
+        document.getElementById('anticipatedBonusPct').innerText = 'Annualized pace is currently below the 1,850 base threshold';
+      }
+
+      // 5. Populate Bonus Tier Table
+      const bonusTableBody = document.getElementById('bonusTableBody');
+      bonusTableBody.innerHTML = '';
+
+      let prevBonusDollars = 0;
+      let prevHours = 1850;
+
+      BONUS_TIERS.forEach((tier, idx) => {
+        const bonusDollars = salary * tier.pct;
+        const changeDollars = idx === 0 ? bonusDollars : bonusDollars - prevBonusDollars;
+        const hoursDelta = idx === 0 ? (tier.hours - 1850 || 25) : tier.hours - prevHours;
+        const dollarsPerHour = hoursDelta > 0 ? changeDollars / hoursDelta : 0;
+        const totalDollarsPerHour = (salary + bonusDollars) / tier.hours;
+
+        const isAnticipated = matchedTier && matchedTier.hours === tier.hours;
+
+        const row = `
+          <tr class="${isAnticipated ? 'bg-emerald-50 font-semibold text-emerald-900 border-l-4 border-emerald-500' : 'hover:bg-slate-50'}">
+            <td class="px-3 py-2 text-slate-800">
+              ${tier.hours.toLocaleString()} Bonus
+              ${isAnticipated ? '<span class="text-[9px] uppercase font-bold text-emerald-700 bg-emerald-100 ml-1.5 px-1.5 py-0.5 rounded">Anticipated</span>' : ''}
+            </td>
+            <td class="px-3 py-2 text-right font-medium text-slate-900">$${bonusDollars.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="px-3 py-2 text-right text-slate-600">${(tier.pct * 100).toFixed(2)}%</td>
+            <td class="px-3 py-2 text-right text-slate-600">$${changeDollars.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="px-3 py-2 text-right text-slate-600">$${dollarsPerHour.toFixed(2)}</td>
+            <td class="px-3 py-2 text-right text-slate-600">$${totalDollarsPerHour.toFixed(2)}</td>
+          </tr>
+        `;
+        bonusTableBody.insertAdjacentHTML('beforeend', row);
+
+        prevBonusDollars = bonusDollars;
+        prevHours = tier.hours;
+      });
     }
 
     function generateMonthlySections(data, startYear, today) {
@@ -580,13 +909,11 @@
         const curMaxPB = runningBillable * (0.03 / 0.97);
         const curCredit = runningBillable + Math.min(runningProBono, curMaxPB);
 
-        // 7-day rolling daily average
         const windowStart = Math.max(0, idx - 6);
         const windowSlice = dailyCredits.slice(windowStart, idx + 1);
         const avg7Day = windowSlice.reduce((a, b) => a + b, 0) / windowSlice.length;
         rollingAvgCredits.push(Number(avg7Day.toFixed(2)));
 
-        // Remaining calendar days forward through May 31
         const nextDay = new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate() + 1);
         const remDays = countCalendarDays(nextDay, endOfBillingCycle);
 
